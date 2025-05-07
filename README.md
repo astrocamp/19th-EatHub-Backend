@@ -13,4 +13,4 @@ python manage.py runserver
 - 張凱迪（Team Lead） [Github](https://github.com/kdchang)
 
 
-- 梁雅絜（Ya Jie）[GitHub](https://github.com/comea22)
+- 梁雅絜（ya jie）[GitHub](https://github.com/comea22)
