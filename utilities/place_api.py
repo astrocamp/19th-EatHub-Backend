@@ -3,15 +3,16 @@ import time
 from dotenv import load_dotenv
 import os
 
-def text_search(keyword, location, radius):
+GOOGLE_MAP_API_BASE_URL = 'https://maps.googleapis.com/maps/api/place'
+
+def text_search(keyword, location, radius, count=61):
     load_dotenv()
     API_KEY = os.getenv('GOOGLE_API_KEY')
     query = keyword
     language = 'zh-TW'
-    type = 'food'
-    url = f'https://maps.googleapis.com/maps/api/place/textsearch/json?query={query}&location={location}&radius={radius}&language={language}&type={type}&key={API_KEY}'
+    url = f'{GOOGLE_MAP_API_BASE_URL}/textsearch/json?query={query}&location={location}&radius={radius}&language={language}&key={API_KEY}'
 
-    all_data = []
+    result = []
 
     while True:
         response = requests.get(url)
@@ -19,13 +20,27 @@ def text_search(keyword, location, radius):
 
         if data.get('status') != 'OK':
             break
+        
+        for place in data.get('results', []):
+            result.append({
+            'name': place.get('name'),
+            'address': place.get('formatted_address'),
+            'rating': place.get('rating'),
+            'latitude': place['geometry']['location']['lat'],
+            'longitude': place['geometry']['location']['lng'],
+            'types': place.get('types', []),
+            'placeId': place.get('place_id'),
+            })
 
-        all_data.append(data)
+            if len(result) >= count:
+                return result
+
         next_page_token = data.get('next_page_token')
 
         if next_page_token:
             time.sleep(3)
+            url = f'{GOOGLE_MAP_API_BASE_URL}/textsearch/json?pagetoken={next_page_token}&key={API_KEY}'
         else:
             break
 
-    return all_data
+    return result
