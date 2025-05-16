@@ -1,9 +1,8 @@
 from rest_framework import serializers
 from .models import Coupon, Promotion
-from restaurants.serializers import SimpleRestaurantSerializer
 
 class CouponSerializer(serializers.ModelSerializer):
-    restaurant = SimpleRestaurantSerializer(read_only=True)
+    restaurant = serializers.SerializerMethodField()
     discount = serializers.SerializerMethodField()
 
     class Meta:
@@ -21,6 +20,11 @@ class CouponSerializer(serializers.ModelSerializer):
             return f"{discount_rate}折 折價券"
         else:
             return "未知折扣類型"
+        
+    def get_restaurant(self, obj):
+        from restaurants.serializers import SimpleRestaurantSerializer
+        return SimpleRestaurantSerializer(obj.restaurant).data
+
         
 class PromotionSerializer(serializers.ModelSerializer):
     class Meta:
