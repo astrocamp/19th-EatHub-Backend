@@ -4,9 +4,10 @@ from rest_framework import status
 from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
 import uuid
-from .models import User,UserCoupon
-from .serializers import SignupSerializer, LoginSerializer, UserCouponListSerializer
+from .models import User,UserCoupon,Favorite
+from .serializers import SignupSerializer, LoginSerializer, UserCouponListSerializer, FavoriteSerializer
 from .utils import token_required_cbv
+from django.shortcuts import get_object_or_404
 
 class SignupView(APIView):
     def post(self, request):
@@ -119,3 +120,11 @@ class UserCouponDeleteView(APIView):
         if deleted_count:
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({'error': '找不到這張優惠券或無權限刪除'}, status=status.HTTP_404_NOT_FOUND)
+
+class FavoriteListView(APIView):
+    @token_required_cbv
+    def get(self, request):
+        user = get_object_or_404(User, uuid=request.user_uuid)
+        favorites = Favorite.objects.filter(user=user).order_by('-created_at')
+        serializer = FavoriteSerializer(favorites, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

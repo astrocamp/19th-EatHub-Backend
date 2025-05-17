@@ -1,5 +1,5 @@
 from django.contrib import admin
-from users.models import User, UserCoupon
+from users.models import User, UserCoupon, Favorite
 
 
 @admin.register(User)
@@ -15,3 +15,9 @@ class UserCouponAdmin(admin.ModelAdmin):
     list_filter = ('is_used',)
     search_fields = ('user__email', 'coupon__title')
     ordering = ('-claimed_at',)
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ('uuid', 'user', 'restaurant', 'created_at')
+    search_fields = ('user__email', 'restaurant__name')
+    ordering = ('-created_at',)

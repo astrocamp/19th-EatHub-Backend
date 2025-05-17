@@ -1,7 +1,6 @@
 from rest_framework import serializers
-from .models import User, UserCoupon
+from .models import User, UserCoupon, Favorite
 from django.contrib.auth.hashers import make_password
-from promotions.models import Coupon
 from promotions.serializers import CouponSerializer
 
 class SignupSerializer(serializers.ModelSerializer):
@@ -37,3 +36,10 @@ class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['user_name', 'image_url', 'uuid']
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    restaurant_uuid = serializers.UUIDField(source='restaurant.uuid', read_only=True)
+
+    class Meta:
+        model = Favorite
+        fields = ['uuid', 'restaurant_uuid', 'created_at']
