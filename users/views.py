@@ -42,7 +42,7 @@ class LoginView(APIView):
                 if check_password(password, user.password):
                     token = str(uuid.uuid4())
                     cache_key = f'user_token:{user.uuid}'
-                    cache.set(cache_key, token, timeout=3600)
+                    cache.set(cache_key, token, timeout=36000)
 
                     response = Response(
                         {
@@ -60,7 +60,7 @@ class LoginView(APIView):
                         'auth_token',
                         cookie_value,
                         httponly=True,
-                        max_age=3600,
+                        max_age=36000,
                         secure=True,
                         samesite='lax',
                     )

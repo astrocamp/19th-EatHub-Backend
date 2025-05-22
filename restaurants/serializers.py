@@ -57,7 +57,7 @@ class RestaurantDetailSerializer(serializers.Serializer):
             "coupon": self.get_coupon(obj),
             "reviews": self.get_reviews(obj),
             "user_status": self.get_user_status(obj),
-    }
+        }
     
     def get_promotion(self, obj):
         promotions = obj.promotions.filter(is_archived=False).order_by("-created_at")
@@ -89,7 +89,7 @@ class RestaurantDetailSerializer(serializers.Serializer):
             'hasReviewed': False
         }
 
-        if not user or user.is_anonymous:
+        if not user:
             return result
 
         result['hasFavorited'] = obj.favorited_by.filter(user=user).exists()
