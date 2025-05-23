@@ -7,4 +7,5 @@ urlpatterns = [
     path('me', views.MeView.as_view()),
     path('logout', views.LogoutView.as_view()),
     path('google-login/', views.GoogleLoginView.as_view()),
+    path('merchant/signup/', views.MerchantSignupView.as_view()),
 ]

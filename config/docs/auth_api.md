@@ -96,7 +96,7 @@ response
 
 
 註冊新商家。
-POST /api/v1/auth/merchant/signup
+POST /api/v1/auth/merchant/signup/
 
 Request Body :
 {
