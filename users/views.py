@@ -89,6 +89,7 @@ class MeView(APIView):
                 'user_uuid': str(user.uuid),
                 'userName': user.user_name,
                 'email': user.email,
+                'role': user.role,
             }, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'error': '使用者不存在'}, status=status.HTTP_404_NOT_FOUND)

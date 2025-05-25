@@ -7,72 +7,33 @@ from django.shortcuts import get_object_or_404
 from users.models import User, UserCoupon
 from rest_framework.response import Response
 
-"""
-GET /api/v1/coupons/<uuid>/
-result = {
-    "restaurant": {
-        "name": "五倍咖啡",
-        "imgUrl": "https://example.com/restaurant.jpg"
-    },
-    "serialNumber": "test20240510",
-    "endedAt": "2025-05-10T05:08:40Z",
-    "createdAt": "2025-05-10T05:09:41.174907Z",
-    "title": "test01",
-    "description": "滿500折50",
-    "discountType": "amount",
-    "discountValue": 50,
-    "total": 100,
-    "isArchived": false,
-    "startedAt": "2025-05-10T05:09:39Z",
-    "uuid": "cd37115d-ce26-42e1-a71b-ceb66d54e163"
-}
+class CreateCouponView(APIView):
+    @token_required_cbv
+    def post(self, request):
+        user = User.objects.filter(uuid=request.user_uuid).first()
+        if not user:
+            return Response({'error': '使用者未登入或不存在'}, status=status.HTTP_401_UNAUTHORIZED)
 
-POST /api/v1/coupons/
-body = {
-  "serialNumber": "test20240510",
-  "title": "test01",
-  "description": "滿500折50",
-  "discountType": "amount",
-  "discountValue": 50,
-  "total": 100,
-  "startedAt": "2025-05-10T05:09:39Z",
-  "endedAt": "2025-05-10T05:08:40Z",
-  "isArchived": false
-}
-#  201 Created
-result = {
-  "serialNumber": "test20240510",
-  "title": "test01",
-  "description": "滿500折50",
-  "discountType": "amount",
-  "discountValue": 50,
-  "total": 100,
-  "isArchived": false,
-  "startedAt": "2025-05-10T05:09:39Z",
-  "endedAt": "2025-05-10T05:08:40Z",
-  "createdAt": "2025-05-13T07:15:41.120000Z",
-  "uuid": "cd37115d-ce26-42e1-a71b-ceb66d54e163",
-  "restaurant": {
-    "name": "五倍咖啡",
-    "imgUrl": "https://example.com/restaurant.jpg"
-  }
-}
-#  400 Bad Request 
-result = {
-  "serialNumber": ["此欄位為必填"],
-  "discountType": ["此欄位為必填"],
-  "discountValue": ["此欄位為必填"]
-}
-"""
-class CouponViewSet(viewsets.ModelViewSet):
-    queryset = Coupon.objects.filter(is_archived=False)
-    serializer_class = CouponSerializer
-    lookup_field = 'uuid'  # 使用 uuid 作為查詢欄位
+        if user.role not in ['merchant', 'vip_merchant']:
+            return Response({'error': '僅限商家使用者新增優惠券'}, status=status.HTTP_403_FORBIDDEN)
 
-    #自動把目前登入的使用者的 restaurant 塞進去
-    def perform_create(self, serializer):
-        user = self.request.user
-        serializer.save(restaurant=user.restaurant)
+        if user.role == 'merchant':
+            has_coupon = Coupon.objects.filter(restaurant=user.restaurant, is_archived=False).exists()
+            if has_coupon:
+                return Response({'error': '一般商家僅能擁有一張有效優惠券'}, status=status.HTTP_403_FORBIDDEN)
+        if user.role == 'vip_merchant':
+            count = Coupon.objects.filter(restaurant=user.restaurant, is_archived=False).count()
+            if count >= 3:
+                return Response({'error': 'VIP 商家最多只能擁有三張有效優惠券'}, status=status.HTTP_403_FORBIDDEN)
+        data = request.data.copy()
+        serializer = CouponSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save(restaurant=user.restaurant)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ClaimCouponView(APIView):
     @token_required_cbv
