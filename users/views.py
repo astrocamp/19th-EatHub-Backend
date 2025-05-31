@@ -1,11 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.utils import timezone
 from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
 import uuid
 from .models import User,UserCoupon,Favorite
-from .serializers import SignupSerializer, LoginSerializer, UserCouponListSerializer,MerchantSignupSerializer
+from .serializers import SignupSerializer, LoginSerializer, UserCouponSerializer, UpdateUserCouponSerializer, UserCouponListSerializer,MerchantSignupSerializer
 from .utils import token_required_cbv
 from django.shortcuts import get_object_or_404
 import requests
@@ -122,7 +123,15 @@ class UserCouponListView(APIView):
         serializer = UserCouponListSerializer(user_coupons, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-class UserCouponDeleteView(APIView):
+
+class UserCouponView(APIView):
+    @token_required_cbv
+    def get(self, request, uuid):
+        user_coupon = get_object_or_404(UserCoupon, uuid=uuid)
+
+        serializer = UserCouponSerializer(user_coupon)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     @token_required_cbv
     def delete(self, request, uuid):
         deleted_count, _ = UserCoupon.objects.filter(
@@ -133,6 +142,34 @@ class UserCouponDeleteView(APIView):
         if deleted_count:
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({'error': '找不到這張優惠券或無權限刪除'}, status=status.HTTP_404_NOT_FOUND)
+
+    @token_required_cbv
+    def patch(self, request, uuid):
+        serializer = UpdateUserCouponSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'error': '資料格式錯誤'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_coupon = UserCoupon.objects.get(uuid=uuid)
+        except UserCoupon.DoesNotExist:
+            return Response({'error': '找不到對應的使用者優惠券'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            is_used = request.data.get('is_used')
+            user_coupon.is_used = is_used
+            user_coupon.used_at = timezone.now() if is_used else None
+            user_coupon.save()
+
+            return Response({
+                'message': 'success',
+                'coupon': {
+                    'serialNumber': user_coupon.coupon.serial_number
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception:
+            return Response({'error': '更新失敗'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class FavoriteListView(APIView):
     @token_required_cbv

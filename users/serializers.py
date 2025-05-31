@@ -32,6 +32,31 @@ class UserCouponListSerializer(serializers.ModelSerializer):
             'used_at',
             'coupon',  
         ]
+
+
+class UserCouponSerializer(serializers.ModelSerializer):
+    coupon = CouponSerializer(read_only=True) 
+
+    class Meta:
+        model = UserCoupon
+        fields = [
+            'uuid',
+            'is_used',
+            'claimed_at',
+            'used_at',
+            'coupon',  
+        ]
+
+class UpdateUserCouponSerializer(serializers.Serializer):
+    coupon = CouponSerializer(read_only=True) 
+
+    class Meta:
+        model = UserCoupon
+        fields = [
+            'is_used',
+        ]
+
+
 class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
