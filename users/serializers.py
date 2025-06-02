@@ -1,12 +1,15 @@
-from rest_framework import serializers
-from .models import User, UserCoupon
 from django.contrib.auth.hashers import make_password
+from rest_framework import serializers
+
 from promotions.serializers import CouponSerializer
+
+from .models import User, UserCoupon
+
 
 class SignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'user_name', 'email', 'password']
+        fields = ["first_name", "last_name", "user_name", "email", "password"]
 
     def validate_password(self, value):
         return make_password(value)
@@ -21,31 +24,33 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserCouponListSerializer(serializers.ModelSerializer):
-    coupon = CouponSerializer(read_only=True) 
+    coupon = CouponSerializer(read_only=True)
 
     class Meta:
         model = UserCoupon
         fields = [
-            'uuid',
-            'is_used',
-            'claimed_at',
-            'used_at',
-            'coupon',  
+            "uuid",
+            "is_used",
+            "claimed_at",
+            "used_at",
+            "coupon",
         ]
+
+
 class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['user_name', 'image_url', 'uuid']
+        fields = ["user_name", "image_url", "uuid"]
 
 
 class MerchantSignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = [ 'user_name', 'email', 'password']
+        fields = ["user_name", "email", "password"]
 
     def validate_password(self, value):
         return make_password(value)
 
     def create(self, validated_data):
-        validated_data['role'] = User.Role.MERCHANT
+        validated_data["role"] = User.Role.MERCHANT
         return User.objects.create(**validated_data)

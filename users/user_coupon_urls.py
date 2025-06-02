@@ -1,7 +1,8 @@
 from django.urls import path
-from .views import UserCouponListView, UserCouponDeleteView
+
+from .views import UserCouponDeleteView, UserCouponListView
 
 urlpatterns = [
-    path('', UserCouponListView.as_view()), 
-    path('<uuid:uuid>/', UserCouponDeleteView.as_view()),
+    path("", UserCouponListView.as_view()),
+    path("<uuid:uuid>/", UserCouponDeleteView.as_view()),
 ]
