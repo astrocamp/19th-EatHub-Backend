@@ -13,9 +13,11 @@ exclude = '''
 [tool.isort]
 profile = "black"
 line_length = 88
-skip = ["migrations", "__pycache__"]
+skip = ["migrations", "__pycache__", "venv", ".venv", "openai"]
+known_third_party = ["django", "rest_framework", "openai"]
 
 [project]
 name = "eathub-backend"
 version = "0.1.0"
+requires-python = ">=3.8"
 dependencies = ["django"]
