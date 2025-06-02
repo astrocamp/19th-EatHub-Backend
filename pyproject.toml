@@ -14,3 +14,8 @@ exclude = '''
 profile = "black"
 line_length = 88
 skip = ["migrations", "__pycache__"]
+
+[project]
+name = "eathub-backend"
+version = "0.1.0"
+dependencies = ["django"]
