@@ -15,12 +15,7 @@ def prepare_payment_order(user, product, amount):
         days_remaining = (latest_sub.ended_at - today).days
         if days_remaining > 7:
             raise ValidationError(f'尚未到期，目前剩餘 {days_remaining} 天，請於到期前 7 日內續訂。')
-        start_date = latest_sub.ended_at +timedelta(days=1)
-    else:
-        start_date = today
-
-    next_date = start_date + timedelta(days=product.interval_days -1)
-
+        
     order_id = f"order_{today.strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}"
     payment_order = PaymentOrder.objects.create(
         order_id=order_id,
@@ -31,4 +26,4 @@ def prepare_payment_order(user, product, amount):
         is_paid=False
     )
 
-    return payment_order, start_date, next_date
+    return payment_order

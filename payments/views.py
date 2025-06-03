@@ -46,7 +46,7 @@ class SubscriptionCreateView(APIView):
             return Response({'error': '找不到產品'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            payment_order, *_ = prepare_payment_order(user, product, amount)
+            payment_order = prepare_payment_order(user, product, amount)
         except ValidationError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
