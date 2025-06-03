@@ -10,6 +10,7 @@ from .subscription_service import create_subscription_after_payment
 from .payment_flow import prepare_payment_order
 from .linepay_service import LinePayService
 from payments.serializers import ProductSerializer
+from payments.validators import validate_payment_request
 
 class ProductListView(APIView):
     @token_required_cbv
@@ -24,39 +25,27 @@ class SubscriptionCreateView(APIView):
     @token_required_cbv
     @check_merchant_role
     def post(self, request):
-        user_uuid = request.user_uuid
         try:
-            user = User.objects.get(uuid=user_uuid)
+            product, amount = validate_payment_request(request.data)
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(uuid=request.user_uuid)
         except User.DoesNotExist:
             return Response({'error': '找不到使用者'}, status=status.HTTP_404_NOT_FOUND)
-
-        product_id = request.data.get('product_id')
-        amount_input = request.data.get('amount')
-
-        if not product_id or not amount_input:
-            return Response({'error': '缺少參數'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            amount = int(amount_input)
-        except ValueError:
-            return Response({'error': '金額需是數字'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            product = Product.objects.get(uuid=product_id)
-        except Product.DoesNotExist:
-            return Response({'error': '找不到產品'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             payment_order = prepare_payment_order(user, product, amount)
         except ValidationError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         service = LinePayService(payment_order, product)
+
         try:
             data = service.send_payment_request()
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
-        if amount != product.amount:
-            return Response({'error': '金額不正確'}, status=status.HTTP_400_BAD_REQUEST)
 
         if data.get('returnCode') == '0000':
             return Response({
