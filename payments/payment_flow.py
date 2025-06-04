@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from payments.models import PaymentOrder, Subscription
 
 
-def prepare_payment_order(user, product, amount):
+def prepare_payment_order(user, product, amount, method):
     #建立付款訂單前，確認是否在 7 天內可以續訂。
     today = timezone.now().date()
     latest_sub = Subscription.objects.filter(user=user).order_by('-ended_at').first()
@@ -23,7 +23,8 @@ def prepare_payment_order(user, product, amount):
         subscription=None,  # 訂閱待確認付款成功後建立
         amount=amount,
         product=product,
-        is_paid=False
+        is_paid=False,
+        method=method
     )
 
     return payment_order
