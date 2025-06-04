@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from payments.models import PaymentOrder, Product
+from payments.models import PaymentOrder, Product, PaymentMethod
 from users.models import User
 from users.utils import token_required_cbv, check_merchant_role
 from .subscription_service import create_subscription_after_payment
@@ -11,6 +11,7 @@ from .payment_flow import prepare_payment_order
 from .linepay_service import LinePayService
 from payments.serializers import ProductSerializer
 from payments.validators import validate_payment_request
+from .ecpay_service import ECPayService
 
 class ProductListView(APIView):
     @token_required_cbv
@@ -92,3 +93,38 @@ class LinePayConfirmView(APIView):
             return Response({'message': '付款確認成功', 'transactionId': transaction_id})
         else:
             return Response({'error': data.get('returnMessage')}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class ECPaySubscriptionCreateView(APIView):
+    @token_required_cbv
+    @check_merchant_role
+    def post(self, request):
+        try:
+            product, amount = validate_payment_request(request.data)
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(uuid=request.user_uuid)
+        except User.DoesNotExist:
+            return Response({'error': '找不到使用者'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            payment_order = prepare_payment_order(user, product, amount)
+            payment_order.method = PaymentMethod.ECPAY
+            payment_order.save()
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            service = ECPayService(payment_order, product)
+            data = service.send_payment_request()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response({
+            'order_id': data['order_id'],
+            'payment_url_web': data['payment_url_web'],
+            'form_html': data['form_html'],
+        }, status=status.HTTP_200_OK)

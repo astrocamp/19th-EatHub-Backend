@@ -23,6 +23,12 @@ LINEPAY_CHANNEL_ID = os.getenv('LINEPAY_CHANNEL_ID')
 LINEPAY_CHANNEL_SECRET = os.getenv('LINEPAY_CHANNEL_SECRET')
 LINEPAY_API_BASE_URL = os.getenv('LINEPAY_API_BASE_URL')
 PUBLIC_DOMAIN = os.getenv('PUBLIC_DOMAIN')
+ECPAY_MERCHANT_ID = os.getenv('ECPAY_MERCHANT_ID')
+ECPAY_HASH_KEY = os.getenv('ECPAY_HASH_KEY')
+ECPAY_HASH_IV = os.getenv('ECPAY_HASH_IV')
+ECPAY_RETURN_URL = os.getenv('ECPAY_RETURN_URL')
+ECPAY_CLIENT_BACK_URL = os.getenv('ECPAY_CLIENT_BACK_URL')
+ECPAY_GATEWAY_URL = os.getenv('ECPAY_GATEWAY_URL')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
