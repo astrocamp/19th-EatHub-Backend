@@ -1,20 +1,20 @@
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view
 from users.utils import token_required_fbv, token_required_cbv, optional_token_cbv
-from .models import Review, Restaurant
-from .serializers import ReviewSerializer, RestaurantSerializer
+from .models import Restaurant
+from .serializers import ReviewSerializer, FullRestaurantSerializer
 from users.models import User, Favorite
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from utilities.place_api import text_search, get_place_details
 from utilities.openai_api import openai_api, find_dish
-from restaurants.models import Restaurant
 from utilities.cloudinary_upload import upload_to_cloudinary
 from utilities.place_api import get_google_photo
 from .serializers import RestaurantDetailSerializer
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import random
+
 
 @api_view(['POST'])
 def recommendRestaurants(request):
@@ -76,7 +76,8 @@ def recommendRestaurants(request):
         )
         restaurant_instances.append(restaurant)
 
-    serializer = RestaurantSerializer(restaurant_instances, many=True)
+    serializer = FullRestaurantSerializer(restaurant_instances, many=True)
+    data = serializer.data
 
     return Response({'result': {
         'dish': recommend_dish,
@@ -140,3 +141,18 @@ class FavoriteRestaurantView(APIView):
             favorite.delete()
             return Response({'success': True}, status=status.HTTP_204_NO_CONTENT)
         return Response({'success': False}, status=status.HTTP_200_OK)
+
+class RecentViewedRestaurantsView(APIView):
+    def get(self, request):
+        uuid_list = request.query_params.getlist("uuids")
+
+        if not uuid_list:
+            return Response({"result": []}, status=status.HTTP_200_OK)
+
+        restaurants = Restaurant.objects.filter(uuid__in=uuid_list)
+        restaurant_map = {str(r.uuid): r for r in restaurants}
+
+        sorted_restaurants = [restaurant_map[uuid] for uuid in uuid_list if uuid in restaurant_map]
+
+        serializer = FullRestaurantSerializer(sorted_restaurants, many=True)
+        return Response({"result": serializer.data}, status=status.HTTP_200_OK)

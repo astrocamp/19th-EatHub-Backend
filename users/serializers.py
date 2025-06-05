@@ -8,6 +8,11 @@ class SignupSerializer(serializers.ModelSerializer):
         model = User
         fields = ['first_name', 'last_name', 'user_name', 'email', 'password']
 
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("此信箱已被註冊")
+        return value
+
     def validate_password(self, value):
         return make_password(value)
 
@@ -32,6 +37,31 @@ class UserCouponListSerializer(serializers.ModelSerializer):
             'used_at',
             'coupon',  
         ]
+
+
+class UserCouponSerializer(serializers.ModelSerializer):
+    coupon = CouponSerializer(read_only=True) 
+
+    class Meta:
+        model = UserCoupon
+        fields = [
+            'uuid',
+            'is_used',
+            'claimed_at',
+            'used_at',
+            'coupon',  
+        ]
+
+class UpdateUserCouponSerializer(serializers.Serializer):
+    coupon = CouponSerializer(read_only=True) 
+
+    class Meta:
+        model = UserCoupon
+        fields = [
+            'is_used',
+        ]
+
+
 class SimpleUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -42,6 +72,11 @@ class MerchantSignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [ 'user_name', 'email', 'password']
+    
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("此信箱已被註冊")
+        return value
 
     def validate_password(self, value):
         return make_password(value)

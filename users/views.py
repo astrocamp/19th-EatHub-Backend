@@ -1,15 +1,26 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
+from django.utils import timezone
 from django.core.cache import cache
 import uuid
 from .models import User,UserCoupon,Favorite
-from .serializers import SignupSerializer, LoginSerializer, UserCouponListSerializer,MerchantSignupSerializer
+from .serializers import SignupSerializer, LoginSerializer, UserCouponSerializer, UpdateUserCouponSerializer, UserCouponListSerializer,MerchantSignupSerializer
 from .utils import token_required_cbv
 from django.shortcuts import get_object_or_404
 import requests
-from restaurants.serializers import RestaurantSerializer
+from restaurants.serializers import FullRestaurantSerializer
+from utilities.email_util import send_email
+import os
+from django.http import JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    return JsonResponse({'detail': 'CSRF cookie set'})
+
 
 class SignupView(APIView):
     def post(self, request):
@@ -64,17 +75,17 @@ class LoginView(APIView):
                         httponly=True,
                         max_age=3600,
                         secure=True,
-                        samesite='lax',
+                        samesite=None,
                     )
                     return response
                 else:
                     return Response(
-                        {'error': '密碼錯誤'},
+                        {'error': '帳號或是密碼錯誤，請重新輸入。'},
                         status=status.HTTP_401_UNAUTHORIZED,
                     )
             except User.DoesNotExist:
                 return Response(
-                    {'error': '使用者不存在'},
+                    {'error': '帳號或是密碼錯誤，請重新輸入。'},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
@@ -122,7 +133,15 @@ class UserCouponListView(APIView):
         serializer = UserCouponListSerializer(user_coupons, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-class UserCouponDeleteView(APIView):
+
+class UserCouponView(APIView):
+    @token_required_cbv
+    def get(self, request, uuid):
+        user_coupon = get_object_or_404(UserCoupon, uuid=uuid)
+
+        serializer = UserCouponSerializer(user_coupon)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     @token_required_cbv
     def delete(self, request, uuid):
         deleted_count, _ = UserCoupon.objects.filter(
@@ -134,6 +153,34 @@ class UserCouponDeleteView(APIView):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({'error': '找不到這張優惠券或無權限刪除'}, status=status.HTTP_404_NOT_FOUND)
 
+    @token_required_cbv
+    def patch(self, request, uuid):
+        serializer = UpdateUserCouponSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'error': '資料格式錯誤'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_coupon = UserCoupon.objects.get(uuid=uuid)
+        except UserCoupon.DoesNotExist:
+            return Response({'error': '找不到對應的使用者優惠券'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            is_used = request.data.get('is_used')
+            user_coupon.is_used = is_used
+            user_coupon.used_at = timezone.now() if is_used else None
+            user_coupon.save()
+
+            return Response({
+                'message': 'success',
+                'coupon': {
+                    'serialNumber': user_coupon.coupon.serial_number
+                }
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception:
+            return Response({'error': '更新失敗'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class FavoriteListView(APIView):
     @token_required_cbv
     def get(self, request):
@@ -141,7 +188,7 @@ class FavoriteListView(APIView):
         favorites = Favorite.objects.filter(user=user).select_related('restaurant').order_by('-created_at')
         restaurants = [f.restaurant for f in favorites]
 
-        serializer = RestaurantSerializer(restaurants, many=True)
+        serializer = FullRestaurantSerializer(restaurants, many=True)
         return Response({"restaurants": serializer.data}, status=status.HTTP_200_OK)
 
 # Google登入
@@ -190,8 +237,8 @@ class GoogleLoginView(APIView):
             'auth_token',
             f'{user.uuid}:{token}',
             httponly=True,
-            secure=False,     # 本地使用 False，上線請改 True
-            samesite='Lax',
+            secure=True,
+            samesite=None,
             max_age=3600,
         )
         return response
@@ -215,3 +262,70 @@ class MerchantSignupView(APIView):
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({'error': '請提供郵件地址'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': '找不到此郵件地址的用戶'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # 生成重設密碼的 token
+        reset_token = str(uuid.uuid4())
+        
+        # 將 token 存入 cache，30 分鐘過期
+        cache.set(f'password_reset:{user.uuid}', reset_token, timeout=1800)
+        
+        # 構建重設密碼連結
+        frontend_domain = os.getenv('FRONTEND_DOMAIN', 'https://eathub.today')
+        reset_url = f"{frontend_domain}/reset-password?token={reset_token}&user_id={user.uuid}"
+        
+        # 發送郵件
+        subject = "EatHub - 重設密碼"
+        html = f"""
+        <html>
+        <body>
+            <h2>重設您的密碼</h2>
+            <p>親愛的 {user.user_name}，</p>
+            <p>請點擊下方連結重設密碼：</p>
+            <p><a href="{reset_url}">重設密碼</a></p>
+            <p>連結將在 30 分鐘後失效</p>
+        </body>
+        </html>
+        """
+        
+        try:
+            send_email(email, subject, html)
+            return Response({'message': '重設密碼郵件已發送'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': '郵件發送失敗'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        token = request.data.get('token')
+        user_id = request.data.get('user_id')
+        new_password = request.data.get('new_password')
+        
+        user = User.objects.get(uuid=user_id)
+        
+        # 驗證 token
+        cache_key = f'password_reset:{user.uuid}'
+        stored_token = cache.get(cache_key)
+        
+        if stored_token == token:
+            # 更新密碼
+            user.password = make_password(new_password)
+            user.save()
+            
+            # 清除 token
+            cache.delete(cache_key)
+            
+            return Response({'message': '密碼重設成功'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': '無效的重設連結'}, status=status.HTTP_400_BAD_REQUEST)
+

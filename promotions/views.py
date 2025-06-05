@@ -1,11 +1,11 @@
-from rest_framework import viewsets, status
-from .models import Coupon, Promotion
-from .serializers import CouponSerializer, UserCouponUsageSerializer, PromotionSerializer, MerchantCouponSerializer
+from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import Coupon, Promotion
+from .serializers import CouponSerializer, UserCouponUsageSerializer, PromotionSerializer, MerchantCouponSerializer, PromotionsCreateSerializer
+from users.models import User, UserCoupon
 from users.utils import token_required_cbv  ,check_merchant_role
 from django.shortcuts import get_object_or_404
-from users.models import User, UserCoupon
-from rest_framework.response import Response
 
 class CreateCouponView(APIView):
     @token_required_cbv
@@ -34,7 +34,6 @@ class CreateCouponView(APIView):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class ClaimCouponView(APIView):
     @token_required_cbv
     def post(self, request, uuid):
@@ -47,6 +46,32 @@ class ClaimCouponView(APIView):
         UserCoupon.objects.create(user=user, coupon=coupon)
         return Response({'success': True}, status=status.HTTP_201_CREATED)
     
+class PromotionCreateView(APIView):
+    @token_required_cbv
+    def post(self, request):
+        user = get_object_or_404(User, uuid=request.user_uuid)
+
+        if user.role not in ['merchant', 'vip_merchant']:
+            return Response({'error': '此帳戶無建立動態權限'}, status=status.HTTP_403_FORBIDDEN)
+
+        if not user.restaurant:
+            return Response({'error': '帳戶未綁定餐廳'}, status=status.HTTP_403_FORBIDDEN)
+
+        promotion_count = user.restaurant.promotions.filter(is_archived=False).count()
+        limit = 3 if user.role == 'vip_merchant' or user.is_vip else 1
+
+        if promotion_count >= limit:
+            role_display = 'VIP 商家' if user.is_vip else '一般商家'
+            return Response({'error': f'{role_display} 最多只能建立 {limit} 則動態'}, status=400)
+
+        serializer = PromotionsCreateSerializer(data=request.data, context={
+            'request': request,
+            'restaurant': user.restaurant,
+        })
+        if serializer.is_valid():
+            promotion = serializer.save()
+            return Response(PromotionsCreateSerializer(promotion).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class MerchantView(APIView):
     @token_required_cbv

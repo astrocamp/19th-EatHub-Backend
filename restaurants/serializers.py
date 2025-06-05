@@ -7,6 +7,7 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.db.models import Case, When, Value, IntegerField
 import uuid
+from django.db.models import Q, Count
 
 MAX_IMAGE_SIZE = 1 * 1024 * 1024
 class ReviewSerializer(serializers.ModelSerializer):
@@ -129,3 +130,24 @@ class RestaurantDetailSerializer(serializers.Serializer):
                 result['hasClaimedCoupon'][str(coupon.uuid)] = coupon.claimed_by.filter(user__uuid=user_uuid).exists()
 
         return result
+    
+class FullRestaurantSerializer(serializers.ModelSerializer):
+     hasAvailableCoupon = serializers.SerializerMethodField()
+     class Meta:
+        model = Restaurant
+        exclude = ['id', 'created_at'] 
+        
+     def get_hasAvailableCoupon(self, obj):
+                now = timezone.now()
+                coupons = obj.coupons.filter(
+                    is_archived=False,
+                ).filter(
+                    Q(started_at__lte=now) | Q(started_at__isnull=True),
+                    Q(ended_at__gte=now) | Q(ended_at__isnull=True),
+                ).annotate(
+                    claimed_count=Count('claimed_by')
+                )
+                return any(
+                    coupon.total is None or coupon.claimed_count < coupon.total
+                    for coupon in coupons
+                )
