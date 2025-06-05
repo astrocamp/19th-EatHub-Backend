@@ -1,9 +1,8 @@
-import uuid
 from django.core.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from payments.models import PaymentOrder, Product, PaymentMethod, PaymentLog
+from payments.models import PaymentOrder, Product, PaymentMethod, PaymentLog, Subscription
 from users.models import User
 from users.utils import token_required_cbv, check_merchant_role
 from .subscription_service import create_subscription_after_payment
@@ -14,6 +13,11 @@ from payments.validators import validate_payment_request
 from .ecpay_service import ECPayService
 from django.shortcuts import get_object_or_404
 import logging
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.http import HttpResponse
+from utilities.ecpay_payment_sdk import ECPayPaymentSdk
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -140,3 +144,43 @@ class ECPaySubscriptionCreateView(APIView):
             'order_id': data['order_id'],
             'form_html': data['form_html']
         }, status=status.HTTP_200_OK)
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class ECPayConfirmView(APIView):
+    def post(self, request):
+        data = request.POST.dict()
+
+        sdk = ECPayPaymentSdk()
+        try:
+            sdk.verify_check_mac_value(data.copy())
+        except Exception as e:
+            return HttpResponse("0|CheckMacValue Error", status=400)
+
+        try:
+            merchant_trade_no = data.get("MerchantTradeNo")
+            payment_order = PaymentOrder.objects.select_related("user", "product").get(order_id=merchant_trade_no)
+        except PaymentOrder.DoesNotExist:
+            return HttpResponse("0|Order Not Found", status=404)
+
+        if payment_order.is_paid:
+            return HttpResponse("1|OK")
+
+        # 建立訂閱
+        subscription = create_subscription_after_payment(payment_order.user, payment_order.product)
+
+        payment_order.subscription = subscription
+        payment_order.is_paid = True
+        payment_order.paid_at = timezone.now()
+        payment_order.save()
+
+        # 記錄 Log
+        PaymentLog.objects.create(
+            payment_order=payment_order,
+            request_payload=data,
+            response_payload={'message': 'ECPay callback success'},
+            return_code=data.get("RtnCode"),
+            return_message=data.get("RtnMsg"),
+            method=payment_order.method
+        )
+
+        return HttpResponse("1|OK")
