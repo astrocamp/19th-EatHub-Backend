@@ -8,16 +8,17 @@ from users.utils import token_required_cbv, check_merchant_role
 from .subscription_service import create_subscription_after_payment
 from .payment_flow import prepare_payment_order
 from .linepay_service import LinePayService
-from payments.serializers import ProductSerializer
+from payments.serializers import ProductSerializer,PaymentOrderSerializer
 from payments.validators import validate_payment_request
 from .ecpay_service import ECPayService
 from django.shortcuts import get_object_or_404
 import logging
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from utilities.ecpay_payment_sdk import ECPayPaymentSdk
 from django.utils import timezone
+from django.conf import settings 
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,8 @@ class LinePayConfirmView(APIView):
             payment_order.is_paid = True
             payment_order.transaction_id = transaction_id
             payment_order.save()
-            return Response({'message': '付款確認成功', 'transactionId': transaction_id})
+            redirect_url = f'{settings.FRONTEND_DOMAIN}/payments/success?orderId={payment_order.order_id}'
+            return HttpResponseRedirect(redirect_url)
         else:
             return Response({'error': data.get('returnMessage')}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -184,3 +186,12 @@ class ECPayConfirmView(APIView):
         )
 
         return HttpResponse("1|OK")
+class PaymentOrderDetailView(APIView):
+    def get(self, request, order_id):
+        try:
+            payment_order = PaymentOrder.objects.get(order_id=order_id)
+        except PaymentOrder.DoesNotExist:
+            return Response({'error': '找不到訂單'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = PaymentOrderSerializer(payment_order)
+        return Response({'result': serializer.data}, status=status.HTTP_200_OK)
