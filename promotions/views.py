@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from .models import Coupon, Promotion
 from .serializers import CouponSerializer, UserCouponUsageSerializer, PromotionSerializer, MerchantCouponSerializer, PromotionsCreateSerializer
 from users.models import User, UserCoupon
-from users.utils import token_required_cbv  ,check_merchant_role
+from users.utils import token_required_cbv, check_merchant_role, check_and_downgrade_vip
 from django.shortcuts import get_object_or_404
 from datetime import date
 
@@ -76,6 +76,8 @@ class PromotionCreateView(APIView):
 
 class MerchantView(APIView):
     @token_required_cbv
+    @check_merchant_role
+    @check_and_downgrade_vip
     def get(self, request):
         user = get_object_or_404(User, uuid=request.user_uuid)
         if user.role not in ['merchant', 'vip_merchant']:
