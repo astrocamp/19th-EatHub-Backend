@@ -83,11 +83,20 @@ class MerchantSignupSerializer(serializers.ModelSerializer):
         fields = [ 'user_name', 'email', 'password']
     
     def validate_email(self, value):
+        try:
+            validate_email(value)
+        except DjangoValidationError:
+            raise serializers.ValidationError("Enter a valid email address.")
+
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("此信箱已被註冊")
+            raise serializers.ValidationError("user with this email already exists.")
         return value
 
     def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)  # 支援多條錯誤訊息
         return make_password(value)
 
     def create(self, validated_data):
