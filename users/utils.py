@@ -4,6 +4,7 @@ from rest_framework import status
 from functools import wraps
 from django.shortcuts import get_object_or_404
 from users.models import User
+from django.utils import timezone
 
 # CBV驗證裝飾器
 def token_required_cbv(view_func):
@@ -81,3 +82,16 @@ def check_merchant_role(view_func):
         request.user = user
         return view_func(self, request, *args, **kwargs)
     return wrapper
+
+def check_and_downgrade_vip(view_func):
+    @wraps(view_func)
+    def wrapped_view(self, request, *args, **kwargs):
+        user = getattr(request, 'user', None)  
+        if user and user.role == 'vip_merchant':
+            latest_sub = user.subscriptions.order_by('-ended_at').first()
+            if latest_sub and latest_sub.ended_at < timezone.now().date():
+                user.role = 'merchant'
+                user.is_vip = False
+                user.save()
+        return view_func(self, request, *args, **kwargs)
+    return wrapped_view
