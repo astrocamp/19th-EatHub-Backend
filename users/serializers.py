@@ -2,6 +2,9 @@ from rest_framework import serializers
 from .models import User, UserCoupon
 from django.contrib.auth.hashers import make_password
 from promotions.serializers import CouponSerializer
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.contrib.auth.password_validation import validate_password
 
 class SignupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -9,15 +12,21 @@ class SignupSerializer(serializers.ModelSerializer):
         fields = ['first_name', 'last_name', 'user_name', 'email', 'password']
 
     def validate_email(self, value):
+        try:
+            validate_email(value)
+        except DjangoValidationError:
+            raise serializers.ValidationError("Enter a valid email address.")
+
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("此信箱已被註冊")
+            raise serializers.ValidationError("user with this email already exists.")
         return value
 
     def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages)  # 支援多條錯誤訊息
         return make_password(value)
-
-    def create(self, validated_data):
-        return User.objects.create(**validated_data)
 
 
 class LoginSerializer(serializers.Serializer):
