@@ -7,7 +7,7 @@ from django.core.cache import cache
 import uuid
 from .models import User,UserCoupon,Favorite
 from .serializers import SignupSerializer, LoginSerializer, UserCouponSerializer, UpdateUserCouponSerializer, UserCouponListSerializer,MerchantSignupSerializer
-from .utils import token_required_cbv
+from .utils import token_required_cbv, check_merchant_role
 from django.shortcuts import get_object_or_404
 import requests
 from restaurants.serializers import FullRestaurantSerializer
@@ -154,15 +154,19 @@ class UserCouponView(APIView):
         return Response({'error': '找不到這張優惠券或無權限刪除'}, status=status.HTTP_404_NOT_FOUND)
 
     @token_required_cbv
+    @check_merchant_role
     def patch(self, request, uuid):
         serializer = UpdateUserCouponSerializer(data=request.data)
         if not serializer.is_valid():
             return Response({'error': '資料格式錯誤'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user_coupon = UserCoupon.objects.get(uuid=uuid)
+            user_coupon = UserCoupon.objects.select_related('coupon__restaurant').get(uuid=uuid)
         except UserCoupon.DoesNotExist:
             return Response({'error': '找不到對應的使用者優惠券'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.restaurant != user_coupon.coupon.restaurant:
+            return Response({'error': '無權限操作其他餐廳的優惠券'}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             is_used = request.data.get('is_used')
@@ -175,7 +179,7 @@ class UserCouponView(APIView):
                 'coupon': {
                     'serialNumber': user_coupon.coupon.serial_number
                 }
-            }, status=status.HTTP_201_CREATED)
+            }, status=status.HTTP_200_OK)
 
         except Exception:
             return Response({'error': '更新失敗'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -283,7 +287,7 @@ class ForgotPasswordView(APIView):
         
         # 構建重設密碼連結
         frontend_domain = os.getenv('FRONTEND_DOMAIN', 'https://eathub.today')
-        reset_url = f"{frontend_domain}reset-password?token={reset_token}&user_id={user.uuid}"
+        reset_url = f"{frontend_domain}/reset-password?token={reset_token}&user_id={user.uuid}"
         
         # 發送郵件
         subject = "EatHub - 重設密碼"

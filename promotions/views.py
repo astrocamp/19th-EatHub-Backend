@@ -6,6 +6,7 @@ from .serializers import CouponSerializer, UserCouponUsageSerializer, PromotionS
 from users.models import User, UserCoupon
 from users.utils import token_required_cbv  ,check_merchant_role
 from django.shortcuts import get_object_or_404
+from datetime import date
 
 class CreateCouponView(APIView):
     @token_required_cbv
@@ -86,11 +87,12 @@ class MerchantView(APIView):
         
         promotions = Promotion.objects.filter(restaurant=restaurant, is_archived=False)
         coupons = Coupon.objects.filter(restaurant=restaurant, is_archived=False)
-
         max_count = 3 if user.role == 'vip_merchant' else 1
         is_coupon_limit_reached = coupons.count() >= max_count
         is_promotion_limit_reached = promotions.count() >= max_count
 
+        latest_sub = user.subscriptions.order_by('-ended_at').first()
+        vip_expiry = latest_sub.ended_at if latest_sub and latest_sub.ended_at >= date.today() else None
 
         return Response({
             "result": {
@@ -102,6 +104,7 @@ class MerchantView(APIView):
                     "role": user.role, 
                     "is_coupon_limit_reached": is_coupon_limit_reached,
                     "is_promotion_limit_reached": is_promotion_limit_reached,
+                    "vip_expiry": vip_expiry,
                 },
                 "promotions": PromotionSerializer(promotions, many=True).data,
                 "coupons":MerchantCouponSerializer(coupons, many=True).data
