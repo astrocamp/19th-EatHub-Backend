@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import CreateCouponView, ClaimCouponView,CouponUsageView,CouponDetailView
+
+from .views import ClaimCouponView, CouponDetailView, CouponUsageView, CreateCouponView
 
 urlpatterns = [
     path('', CreateCouponView.as_view()),

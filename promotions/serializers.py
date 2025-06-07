@@ -1,11 +1,13 @@
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-from .models import Coupon, Promotion
-from django.core.files.base import ContentFile
-from utilities.cloudinary_upload import upload_to_cloudinary
 import uuid
 
+from django.core.files.base import ContentFile
+from rest_framework import serializers
+
 from users.models import UserCoupon
+from utilities.cloudinary_upload import upload_to_cloudinary
+
+from .models import Coupon, Promotion
+
 
 class CouponSerializer(serializers.ModelSerializer):
     restaurant = serializers.SerializerMethodField()
@@ -13,30 +15,34 @@ class CouponSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Coupon
-        exclude = ['id'] 
+        exclude = ['id']
 
     def get_discount(self, obj):
         if not obj.discount_type or obj.discount_value is None:
             return None
 
-        if obj.discount_type == "金額":
-            return f"{obj.discount_value}元 折價券"
-        elif obj.discount_type == "百分比":            
+        if obj.discount_type == '金額':
+            return f'{obj.discount_value}元 折價券'
+        elif obj.discount_type == '百分比':
             discount_rate = round(10 - obj.discount_value / 10, 1)
-            return f"{discount_rate}折 折價券"
+            return f'{discount_rate}折 折價券'
         else:
-            return "未知折扣類型"       
+            return '未知折扣類型'
 
     def get_restaurant(self, obj):
         from restaurants.serializers import SimpleRestaurantSerializer
+
         return SimpleRestaurantSerializer(obj.restaurant).data
-        
+
+
 class PromotionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Promotion
         exclude = ['id']
 
+
 MAX_IMAGE_SIZE = 1 * 1024 * 1024  # 1MB
+
 
 class PromotionsCreateSerializer(serializers.ModelSerializer):
     image_url = serializers.URLField(read_only=True)
@@ -64,10 +70,9 @@ class PromotionsCreateSerializer(serializers.ModelSerializer):
             except Exception as e:
                 raise serializers.ValidationError({'image': f'圖片處理失敗：{str(e)}'})
 
-        return Promotion.objects.create(
-            restaurant=restaurant,
-            **validated_data
-        )
+        return Promotion.objects.create(restaurant=restaurant, **validated_data)
+
+
 class MerchantCouponSerializer(CouponSerializer):
     redeemed_count = serializers.SerializerMethodField()
     used_count = serializers.SerializerMethodField()
@@ -77,6 +82,8 @@ class MerchantCouponSerializer(CouponSerializer):
 
     def get_used_count(self, obj):
         return obj.claimed_by.filter(is_used=True).count()
+
+
 class UserCouponUsageSerializer(serializers.ModelSerializer):
     user = serializers.EmailField(source='user.email')
 

@@ -1,5 +1,7 @@
-from django.db import models
 import uuid
+
+from django.db import models
+
 
 # 最新消息
 class Promotion(models.Model):
@@ -13,9 +15,10 @@ class Promotion(models.Model):
         'restaurants.Restaurant',
         on_delete=models.CASCADE,
         related_name='promotions',
-        )  # 所屬餐廳
+    )  # 所屬餐廳
     created_at = models.DateTimeField(auto_now_add=True)  # 建立時間
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # uuid
+
 
 # 酷碰卷
 class Coupon(models.Model):
@@ -26,7 +29,7 @@ class Coupon(models.Model):
         'restaurants.Restaurant',
         on_delete=models.CASCADE,
         related_name='coupons',
-        )  # 所屬餐廳
+    )  # 所屬餐廳
     title = models.CharField(max_length=255)  # 優惠券標題
     description = models.TextField(blank=True, null=True)  # 說明文字，可空
     discount_type = models.CharField(max_length=255)  # 折扣類型（例：金額、百分比）
@@ -35,5 +38,6 @@ class Coupon(models.Model):
     is_archived = models.BooleanField(default=False)  # 是否封存，預設 False
     started_at = models.DateTimeField(blank=True, null=True)  # 開始時間，可空
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # uuid
+
     def __str__(self):
-        return f"{self.title} - {self.restaurant.name}"
+        return f'{self.title} - {self.restaurant.name}'
