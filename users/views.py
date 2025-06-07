@@ -1,20 +1,30 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth.hashers import check_password, make_password
-from django.utils import timezone
-from django.core.cache import cache
+import os
 import uuid
-from .models import User,UserCoupon,Favorite
-from .serializers import SignupSerializer, LoginSerializer, UserCouponSerializer, UpdateUserCouponSerializer, UserCouponListSerializer,MerchantSignupSerializer
-from .utils import token_required_cbv, check_merchant_role
-from django.shortcuts import get_object_or_404
+
 import requests
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.cache import cache
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from restaurants.serializers import FullRestaurantSerializer
 from utilities.email_util import send_email
-import os
-from django.http import JsonResponse
-from django.views.decorators.csrf import ensure_csrf_cookie
+
+from .models import Favorite, User, UserCoupon
+from .serializers import (
+    LoginSerializer,
+    MerchantSignupSerializer,
+    SignupSerializer,
+    UpdateUserCouponSerializer,
+    UserCouponListSerializer,
+    UserCouponSerializer,
+)
+from .utils import check_merchant_role, token_required_cbv
 
 
 @ensure_csrf_cookie
@@ -97,15 +107,19 @@ class MeView(APIView):
     def get(self, request):
         try:
             user = User.objects.get(uuid=request.user_uuid)
-            return Response({
-                'message': '驗證成功',
-                'user_uuid': str(user.uuid),
-                'userName': user.user_name,
-                'email': user.email,
-                'role': user.role,
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    'message': '驗證成功',
+                    'user_uuid': str(user.uuid),
+                    'userName': user.user_name,
+                    'email': user.email,
+                    'role': user.role,
+                },
+                status=status.HTTP_200_OK,
+            )
         except User.DoesNotExist:
             return Response({'error': '使用者不存在'}, status=status.HTTP_404_NOT_FOUND)
+
 
 class LogoutView(APIView):
     def post(self, request):
@@ -123,6 +137,7 @@ class LogoutView(APIView):
         response = Response({'message': '登出成功'})
         response.delete_cookie('auth_token')
         return response
+
 
 class UserCouponListView(APIView):
     @token_required_cbv
@@ -145,28 +160,27 @@ class UserCouponView(APIView):
     @token_required_cbv
     def delete(self, request, uuid):
         deleted_count, _ = UserCoupon.objects.filter(
-            uuid=uuid,
-            user__uuid=request.user_uuid
+            uuid=uuid, user__uuid=request.user_uuid
         ).delete()
 
         if deleted_count:
             return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response({'error': '找不到這張優惠券或無權限刪除'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'success': False}, status=status.HTTP_404_NOT_FOUND)
 
     @token_required_cbv
     @check_merchant_role
     def patch(self, request, uuid):
         serializer = UpdateUserCouponSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response({'error': '資料格式錯誤'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'success': False}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             user_coupon = UserCoupon.objects.select_related('coupon__restaurant').get(uuid=uuid)
         except UserCoupon.DoesNotExist:
-            return Response({'error': '找不到對應的使用者優惠券'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'success': False}, status=status.HTTP_404_NOT_FOUND)
 
         if request.user.restaurant != user_coupon.coupon.restaurant:
-            return Response({'error': '無權限操作其他餐廳的優惠券'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'success': False}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             is_used = request.data.get('is_used')
@@ -174,26 +188,30 @@ class UserCouponView(APIView):
             user_coupon.used_at = timezone.now() if is_used else None
             user_coupon.save()
 
-            return Response({
-                'message': 'success',
-                'coupon': {
-                    'serialNumber': user_coupon.coupon.serial_number
-                }
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    'message': 'success',
+                    'coupon': {'serialNumber': user_coupon.coupon.serial_number},
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception:
-            return Response({'error': '更新失敗'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'success': False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class FavoriteListView(APIView):
     @token_required_cbv
     def get(self, request):
         user = get_object_or_404(User, uuid=request.user_uuid)
-        favorites = Favorite.objects.filter(user=user).select_related('restaurant').order_by('-created_at')
+        favorites = (
+            Favorite.objects.filter(user=user).select_related('restaurant').order_by('-created_at')
+        )
         restaurants = [f.restaurant for f in favorites]
 
         serializer = FullRestaurantSerializer(restaurants, many=True)
-        return Response({"restaurants": serializer.data}, status=status.HTTP_200_OK)
+        return Response({'restaurants': serializer.data}, status=status.HTTP_200_OK)
+
 
 # Google登入
 class GoogleLoginView(APIView):
@@ -208,7 +226,9 @@ class GoogleLoginView(APIView):
         google_response = requests.get(google_user_info_url, headers=headers)
 
         if google_response.status_code != 200:
-            return Response({'error': 'Google token 無效或過期'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Google token 無效或過期'}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         data = google_response.json()
         google_id = data.get('sub')
@@ -223,20 +243,22 @@ class GoogleLoginView(APIView):
             defaults={
                 'email': email,
                 'user_name': name,
-            }
+            },
         )
 
         token = str(uuid.uuid4())
         cache.set(f'user_token:{user.uuid}', token, timeout=3600)
 
-        response = Response({
-            'message': '登入成功（Google）',
-            'user': {
-                'uuid': user.uuid,
-                'userName': user.user_name,
-                'email': user.email,
+        response = Response(
+            {
+                'message': '登入成功（Google）',
+                'user': {
+                    'uuid': user.uuid,
+                    'userName': user.user_name,
+                    'email': user.email,
+                },
             }
-        })
+        )
         response.set_cookie(
             'auth_token',
             f'{user.uuid}:{token}',
@@ -246,7 +268,7 @@ class GoogleLoginView(APIView):
             max_age=3600,
         )
         return response
-        
+
 
 class MerchantSignupView(APIView):
     def post(self, request):
@@ -267,30 +289,31 @@ class MerchantSignupView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class ForgotPasswordView(APIView):
     def post(self, request):
         email = request.data.get('email')
-        
+
         if not email:
             return Response({'error': '請提供郵件地址'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return Response({'error': '找不到此郵件地址的用戶'}, status=status.HTTP_404_NOT_FOUND)
-        
+            return Response({'success': False}, status=status.HTTP_404_NOT_FOUND)
+
         # 生成重設密碼的 token
         reset_token = str(uuid.uuid4())
-        
+
         # 將 token 存入 cache，30 分鐘過期
         cache.set(f'password_reset:{user.uuid}', reset_token, timeout=1800)
-        
+
         # 構建重設密碼連結
         frontend_domain = os.getenv('FRONTEND_DOMAIN', 'https://eathub.today')
-        reset_url = f"{frontend_domain}/reset-password?token={reset_token}&user_id={user.uuid}"
-        
+        reset_url = f'{frontend_domain}/reset-password?token={reset_token}&user_id={user.uuid}'
+
         # 發送郵件
-        subject = "EatHub - 重設密碼"
+        subject = 'EatHub - 重設密碼'
         html = f"""
         <html>
         <body>
@@ -302,34 +325,34 @@ class ForgotPasswordView(APIView):
         </body>
         </html>
         """
-        
+
         try:
             send_email(email, subject, html)
-            return Response({'message': '重設密碼郵件已發送'}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': '郵件發送失敗'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'success': True}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({'success': False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class ResetPasswordView(APIView):
     def post(self, request):
         token = request.data.get('token')
         user_id = request.data.get('user_id')
         new_password = request.data.get('new_password')
-        
+
         user = User.objects.get(uuid=user_id)
-        
+
         # 驗證 token
         cache_key = f'password_reset:{user.uuid}'
         stored_token = cache.get(cache_key)
-        
+
         if stored_token == token:
             # 更新密碼
             user.password = make_password(new_password)
             user.save()
-            
+
             # 清除 token
             cache.delete(cache_key)
-            
-            return Response({'message': '密碼重設成功'}, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': '無效的重設連結'}, status=status.HTTP_400_BAD_REQUEST)
 
+            return Response({'success': True}, status=status.HTTP_200_OK)
+        else:
+            return Response({'success': False}, status=status.HTTP_400_BAD_REQUEST)

@@ -1,10 +1,13 @@
-from rest_framework import serializers
-from .models import User, UserCoupon
 from django.contrib.auth.hashers import make_password
-from promotions.serializers import CouponSerializer
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
+from rest_framework import serializers
+
+from promotions.serializers import CouponSerializer
+
+from .models import User, UserCoupon
+
 
 class SignupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,10 +18,10 @@ class SignupSerializer(serializers.ModelSerializer):
         try:
             validate_email(value)
         except DjangoValidationError:
-            raise serializers.ValidationError("Enter a valid email address.")
+            raise serializers.ValidationError('Enter a valid email address.')
 
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("user with this email already exists.")
+            raise serializers.ValidationError('user with this email already exists.')
         return value
 
     def validate_password(self, value):
@@ -35,7 +38,7 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserCouponListSerializer(serializers.ModelSerializer):
-    coupon = CouponSerializer(read_only=True) 
+    coupon = CouponSerializer(read_only=True)
 
     class Meta:
         model = UserCoupon
@@ -44,12 +47,12 @@ class UserCouponListSerializer(serializers.ModelSerializer):
             'is_used',
             'claimed_at',
             'used_at',
-            'coupon',  
+            'coupon',
         ]
 
 
 class UserCouponSerializer(serializers.ModelSerializer):
-    coupon = CouponSerializer(read_only=True) 
+    coupon = CouponSerializer(read_only=True)
 
     class Meta:
         model = UserCoupon
@@ -58,11 +61,12 @@ class UserCouponSerializer(serializers.ModelSerializer):
             'is_used',
             'claimed_at',
             'used_at',
-            'coupon',  
+            'coupon',
         ]
 
+
 class UpdateUserCouponSerializer(serializers.Serializer):
-    coupon = CouponSerializer(read_only=True) 
+    coupon = CouponSerializer(read_only=True)
 
     class Meta:
         model = UserCoupon
@@ -80,16 +84,16 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 class MerchantSignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = [ 'user_name', 'email', 'password']
-    
+        fields = ['user_name', 'email', 'password']
+
     def validate_email(self, value):
         try:
             validate_email(value)
         except DjangoValidationError:
-            raise serializers.ValidationError("Enter a valid email address.")
+            raise serializers.ValidationError('Enter a valid email address.')
 
         if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("user with this email already exists.")
+            raise serializers.ValidationError('user with this email already exists.')
         return value
 
     def validate_password(self, value):
