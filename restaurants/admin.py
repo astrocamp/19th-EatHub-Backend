@@ -1,11 +1,13 @@
 from django.contrib import admin
-from .models import Review, Restaurant
+
+from .models import Restaurant, Review
 
 
 @admin.register(Restaurant)
 class RestaurantAdmin(admin.ModelAdmin):
     list_display = ('name', 'address', 'phone', 'google_rating', 'place_id')
-    search_fields = ('name',) 
+    search_fields = ('name',)
+
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
