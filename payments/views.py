@@ -1,26 +1,29 @@
-from django.core.exceptions import ValidationError
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from payments.models import PaymentOrder, Product, PaymentMethod, PaymentLog, Subscription
-from users.models import User
-from users.utils import token_required_cbv, check_merchant_role
-from .subscription_service import create_subscription_after_payment
-from .payment_flow import prepare_payment_order
-from .linepay_service import LinePayService
-from payments.serializers import ProductSerializer,PaymentOrderSerializer
-from payments.validators import validate_payment_request
-from .ecpay_service import ECPayService, verify_check_mac_value
-from django.shortcuts import get_object_or_404
 import logging
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse, HttpResponseRedirect
-from utilities.ecpay_payment_sdk import ECPayPaymentSdk
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.conf import settings 
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from payments.models import PaymentLog, PaymentMethod, PaymentOrder, Product
+from payments.serializers import PaymentOrderSerializer, ProductSerializer
+from payments.validators import validate_payment_request
+from users.models import User
+from users.utils import check_merchant_role, token_required_cbv
+
+from .ecpay_service import ECPayService, verify_check_mac_value
+from .linepay_service import LinePayService
+from .payment_flow import prepare_payment_order
+from .subscription_service import create_subscription_after_payment
 
 logger = logging.getLogger(__name__)
+
 
 class ProductListView(APIView):
     @token_required_cbv
@@ -29,6 +32,7 @@ class ProductListView(APIView):
         products = Product.objects.all()
         serializer = ProductSerializer(products, many=True)
         return Response(serializer.data)
+
 
 # 建立付款訂單與 LINE PAY 請求
 class SubscriptionCreateView(APIView):
@@ -46,7 +50,9 @@ class SubscriptionCreateView(APIView):
             return Response({'error': '找不到使用者'}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            payment_order = prepare_payment_order(user, product, amount, method=PaymentMethod.LINEPAY)
+            payment_order = prepare_payment_order(
+                user, product, amount, method=PaymentMethod.LINEPAY
+            )
         except ValidationError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -58,13 +64,17 @@ class SubscriptionCreateView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if data.get('returnCode') == '0000':
-            return Response({
-                'order_id': payment_order.order_id,
-                'payment_url_web': data['info']['paymentUrl']['web'],
-                'payment_url_app': data['info']['paymentUrl']['app']
-            })
+            return Response(
+                {
+                    'order_id': payment_order.order_id,
+                    'payment_url_web': data['info']['paymentUrl']['web'],
+                    'payment_url_app': data['info']['paymentUrl']['app'],
+                }
+            )
         else:
-            return Response({'error': data.get('returnMessage')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': data.get('returnMessage')}, status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 # 使用者付款成功後，LINE PAY 會自動導向 confirmUrl（GET 請求）
@@ -76,7 +86,9 @@ class LinePayConfirmView(APIView):
         return self.handle_confirmation(request)
 
     def handle_confirmation(self, request):
-        transaction_id = request.query_params.get('transactionId') or request.data.get('transactionId')
+        transaction_id = request.query_params.get('transactionId') or request.data.get(
+            'transactionId'
+        )
         order_id = request.query_params.get('orderId') or request.data.get('orderId')
 
         if not transaction_id or not order_id:
@@ -86,7 +98,7 @@ class LinePayConfirmView(APIView):
             payment_order = PaymentOrder.objects.get(order_id=order_id)
         except PaymentOrder.DoesNotExist:
             return Response({'error': '找不到訂單'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         service = LinePayService(payment_order, payment_order.product)
         try:
             data = service.confirm_payment(transaction_id)
@@ -94,15 +106,22 @@ class LinePayConfirmView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if data.get('returnCode') == '0000':
-            subscription = create_subscription_after_payment(payment_order.user, payment_order.product)
+            subscription = create_subscription_after_payment(
+                payment_order.user, payment_order.product
+            )
             payment_order.subscription = subscription
             payment_order.is_paid = True
             payment_order.transaction_id = transaction_id
             payment_order.save()
-            redirect_url = f'{settings.FRONTEND_DOMAIN}/payments/success?orderId={payment_order.order_id}'
+            redirect_url = (
+                f'{settings.FRONTEND_DOMAIN}/payments/success?orderId={payment_order.order_id}'
+            )
             return HttpResponseRedirect(redirect_url)
         else:
-            return Response({'error': data.get('returnMessage')}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': data.get('returnMessage')}, status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class ECPaySubscriptionCreateView(APIView):
     @token_required_cbv
@@ -117,10 +136,7 @@ class ECPaySubscriptionCreateView(APIView):
 
         try:
             payment_order = prepare_payment_order(
-                user=user,
-                product=product,
-                amount=amount,
-                method=PaymentMethod.ECPAY
+                user=user, product=product, amount=amount, method=PaymentMethod.ECPAY
             )
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -136,35 +152,36 @@ class ECPaySubscriptionCreateView(APIView):
                 response_payload={'form_html': data['form_html']},
                 return_code='0000',
                 return_message='建立綠界付款表單成功',
-                method=PaymentMethod.ECPAY
+                method=PaymentMethod.ECPAY,
             )
-        except Exception as e:
-            logger.exception("ECPay 建立訂單失敗")
+        except Exception:
+            logger.exception('ECPay 建立訂單失敗')
             return Response({'error': '建立付款連線時發生錯誤'}, status=status.HTTP_502_BAD_GATEWAY)
 
-        return Response({
-            'order_id': data['order_id'],
-            'form_html': data['form_html']
-        }, status=status.HTTP_200_OK)
-    
+        return Response(
+            {'order_id': data['order_id'], 'form_html': data['form_html']},
+            status=status.HTTP_200_OK,
+        )
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class ECPayConfirmView(APIView):
     def post(self, request):
         data = request.POST.dict()
         try:
             verify_check_mac_value(data)
-        except Exception as e:
-            return HttpResponse("0|CheckMacValue Error", status=400)
+        except Exception:
+            return HttpResponse('0|CheckMacValue Error', status=400)
 
         try:
-            merchant_trade_no = data.get("MerchantTradeNo")
-            order_id = f"order_{merchant_trade_no[:8]}_{merchant_trade_no[8:]}"
+            merchant_trade_no = data.get('MerchantTradeNo')
+            order_id = f'order_{merchant_trade_no[:8]}_{merchant_trade_no[8:]}'
             payment_order = PaymentOrder.objects.get(order_id=order_id)
         except PaymentOrder.DoesNotExist:
-            return HttpResponse("0|Order Not Found", status=404)
+            return HttpResponse('0|Order Not Found', status=404)
 
         if payment_order.is_paid:
-            return HttpResponse("1|OK")
+            return HttpResponse('1|OK')
 
         # 建立訂閱
         subscription = create_subscription_after_payment(payment_order.user, payment_order.product)
@@ -179,13 +196,14 @@ class ECPayConfirmView(APIView):
             payment_order=payment_order,
             request_payload=data,
             response_payload={'message': 'ECPay callback success'},
-            return_code=data.get("RtnCode"),
-            return_message=data.get("RtnMsg"),
-            method=payment_order.method
+            return_code=data.get('RtnCode'),
+            return_message=data.get('RtnMsg'),
+            method=payment_order.method,
         )
 
-        return HttpResponse("1|OK")
-    
+        return HttpResponse('1|OK')
+
+
 class PaymentOrderDetailView(APIView):
     def get(self, request, order_id):
         try:
