@@ -43,7 +43,7 @@ DEBUG = os.getenv('DEBUG')
 ALLOWED_HOSTS = [
     'eathub.today',
     'localhost',
-    '127.0.0.1'
+    '127.0.0.1',
 ]
 
 
@@ -80,13 +80,14 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:5174',
-    'https://eathub.today'
+    'https://eathub.today',
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     'https://eathub.today',
+    os.getenv('FRONTEND_DOMAIN'),
 ]
 
 CSRF_COOKIE_HTTPONLY = False
@@ -147,7 +148,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Taipei'
 
 USE_I18N = True
 
