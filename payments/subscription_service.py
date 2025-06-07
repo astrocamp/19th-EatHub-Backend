@@ -1,10 +1,13 @@
-from django.utils import timezone
 from datetime import timedelta
+
+from django.utils import timezone
+
 from payments.models import Subscription
 from users.models import User
 
+
 def create_subscription_after_payment(user, product):
-    #付款成功後建立訂閱，並升級商家為 VIP
+    # 付款成功後建立訂閱，並升級商家為 VIP
     today = timezone.now().date()
     latest_sub = Subscription.objects.filter(user=user).order_by('-ended_at').first()
 
@@ -20,7 +23,7 @@ def create_subscription_after_payment(user, product):
         product=product,
         start_date=start_date,
         ended_at=ended_at,
-        next_payment_date=next_payment_date
+        next_payment_date=next_payment_date,
     )
     if user.role == User.Role.MERCHANT:
         user.role = User.Role.VIP_MERCHANT
