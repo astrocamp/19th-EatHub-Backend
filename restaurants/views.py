@@ -22,8 +22,8 @@ class RecommendRestaurants(APIView):
         flavors = data['flavors']
         mains = data['mains']
         staples = data['staples']
-        latitude = data['user_location']['latitude']
-        longitude = data['user_location']['longitude']
+        latitude = data['user_location']['latitude'] or 25.042458653940916
+        longitude = data['user_location']['longitude'] or 121.51376697006941
         location = f'{latitude},{longitude}'
         keywords = openai_api(find_dish(flavors, mains, staples)).split(',')
         random.shuffle(keywords)
