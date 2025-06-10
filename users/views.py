@@ -99,7 +99,7 @@ class LoginView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': '帳號或是密碼錯誤，請重新輸入。'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MeView(APIView):
