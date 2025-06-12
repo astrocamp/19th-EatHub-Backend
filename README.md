@@ -6,6 +6,14 @@
 
 請參閱 Makefile
 
+```
+make up env=local
+make down env=local
+
+make up env=prod
+make down env=prod
+```
+
 ## Contributor 專案開發團隊
 
 - 張凱迪（Team Lead） [Github](https://github.com/kdchang)

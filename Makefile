@@ -1,8 +1,13 @@
 # Makefile - for Docker Compose Prod Deployment
 
 # === 參數設定 ===
-COMPOSE_FILE=docker-compose.prod.yml
-ENV_FILE=.env
+ifeq ($(env),prod)
+	COMPOSE_FILE := docker-compose.prod.yml
+	ENV_FILE := .env
+else
+	COMPOSE_FILE ?= docker-compose.local.yml
+	ENV_FILE ?= .env
+endif
 PROJECT_DIR=$(shell pwd)
 DOCKER_COMPOSE=docker-compose --env-file $(PROJECT_DIR)/$(ENV_FILE) -f $(COMPOSE_FILE)
 
