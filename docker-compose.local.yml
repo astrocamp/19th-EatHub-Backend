@@ -27,7 +27,8 @@ services:
   redis:
     image: redis:alpine
     container_name: redis_local
-
+    ports:
+      - "6379:6379"
   nginx:
     image: nginx:stable-alpine
     container_name: nginx_local
