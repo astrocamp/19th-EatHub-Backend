@@ -2,6 +2,8 @@ services:
   web:
     build: ./
     container_name: django_prod
+    env_file:
+      - .env
     environment:
       DJANGO_SETTINGS_MODULE: config.settings
       POSTGRES_DB: ${POSTGRES_DB}
@@ -10,11 +12,13 @@ services:
       REDIS_HOST: redis
     volumes:
       - static_volume:/app/staticfiles
+      - ./config/settings.py:/app/config/settings.py
     ports:
       - "8000:8000"
     depends_on:
       - db
       - redis
+    restart: always
 
   db:
     image: postgres:15
