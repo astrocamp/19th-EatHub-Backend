@@ -2,23 +2,9 @@
 
 美食行銷推薦平台。
 
-## Dev 專案開發執行
+## 專案開發執行
 
-```
-docker-compose -f docker-compose.local.yml down -v
-docker-compose -f docker-compose.local.yml up --build
-docker-compose -f docker-compose.local.yml exec web python manage.py migrate
-docker-compose -f docker-compose.local.yml exec web python manage.py createsuperuser
-```
-
-## Prod 專案執行
-
-```
-docker-compose -f docker-compose.prod.yml down -v
-docker-compose -f docker-compose.prod.yml up --build
-docker-compose -f docker-compose.prod.yml exec web python manage.py migrate
-docker-compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
-```
+請參閱 Makefile
 
 ## Contributor 專案開發團隊
 
