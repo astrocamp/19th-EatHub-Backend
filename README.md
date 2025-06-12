@@ -8,7 +8,7 @@ EatHub 是一個專為選擇困難症設計的美食推薦平台。根據你的�
 
 掃描 QR Code，快速推薦在地合適美食餐廳
 
-![Moordule-QRcode](https://res.cloudinary.com/dztenycjx/image/upload/v1749717013/restaurants/review_e59a5b21-a22c-40df-b1fb-45681734d72c.jpg.png)
+<img src="https://res.cloudinary.com/dztenycjx/image/upload/v1749717013/restaurants/review_e59a5b21-a22c-40df-b1fb-45681734d72c.jpg.png" alt="Moordule-QRcode" width="400"/>
 
 專案網址 : https://eathub.today
 
