@@ -47,14 +47,31 @@ EatHub 是一個專為選擇困難症設計的美食推薦平台。根據你的�
 
 ## 專案啟動與開發指令
 
-請參閱 Makefile
+請參閱 Makefile，本機開發和測試：
 
 ```
 make up env=local
 make down env=local
+docker-compose -f docker-compose.local.yml exec -it web pytest
+```
 
+```
+docker-compose -f docker-compose.local.yml exec web python manage.py migrate
+docker-compose -f docker-compose.local.yml exec web python manage.py createsuperuser
+docker-compose -f docker-compose.local.yml exec web python manage.py collectstatic
+```
+
+## 專案部署執行
+
+```
 make up env=prod
 make down env=prod
+```
+
+```
+docker-compose -f docker-compose.prod.yml exec web python manage.py migrate
+docker-compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
+docker-compose -f docker-compose.prod.yml exec web python manage.py collectstatic
 ```
 
 ## Contributor 專案開發團隊
