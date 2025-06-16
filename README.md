@@ -52,13 +52,15 @@ EatHub 是一個專為選擇困難症設計的美食推薦平台。根據你的�
 ```
 make up env=local
 make down env=local
-docker-compose -f docker-compose.local.yml exec -it web pytest
+make test
+make migrate
+make createsuperuser
+make collectstatic
 ```
 
 ```
-docker-compose -f docker-compose.local.yml exec web python manage.py migrate
-docker-compose -f docker-compose.local.yml exec web python manage.py createsuperuser
-docker-compose -f docker-compose.local.yml exec web python manage.py collectstatic
+docker compose -f docker-compose.local.yml exec web pytest
+docker compose -f docker-compose.local.yml exec web python manage.py migrate
 ```
 
 ## 專案部署執行
@@ -66,12 +68,13 @@ docker-compose -f docker-compose.local.yml exec web python manage.py collectstat
 ```
 make up env=prod
 make down env=prod
+make migrate env=prod
+make createsuperuser env=prod
+make collectstatic env=prod
 ```
 
 ```
-docker-compose -f docker-compose.prod.yml exec web python manage.py migrate
-docker-compose -f docker-compose.prod.yml exec web python manage.py createsuperuser
-docker-compose -f docker-compose.prod.yml exec web python manage.py collectstatic
+docker compose -f docker-compose.prod.yml exec web python manage.py migrate
 ```
 
 ## Contributor 專案開發團隊
